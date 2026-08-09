@@ -1,0 +1,16 @@
+[
+{
+  "modid": "ae2_quick_encoding",
+  "name": "AE2 Quick Encoding",
+  "description": "Creates Applied Energistics 2 patterns from Had Enough Items recipe bookmarks.",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["AE2 Quick Encoding"],
+  "credits": "Forge, Applied Energistics 2 and Had Enough Items",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": ["forge", "appliedenergistics2", "jei"]
+}
+]
