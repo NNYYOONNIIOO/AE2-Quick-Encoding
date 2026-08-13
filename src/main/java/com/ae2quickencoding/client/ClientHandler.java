@@ -224,6 +224,7 @@ public final class ClientHandler {
             return false;
         }
         if (mouseButton == 2 && !buttonState) {
+            saveSettingsButtonPosition(gui);
             SETTINGS_BUTTON_DRAGS.remove(gui);
             return true;
         }
@@ -236,6 +237,7 @@ public final class ClientHandler {
             return false;
         }
         if (!Mouse.isButtonDown(2)) {
+            saveSettingsButtonPosition(gui);
             SETTINGS_BUTTON_DRAGS.remove(gui);
             return false;
         }
@@ -261,6 +263,17 @@ public final class ClientHandler {
         position.x = button.x;
         position.y = button.y;
         return true;
+    }
+
+    private static void saveSettingsButtonPosition(GuiScreen gui) {
+        SettingsButton button = findSettingsButton(gui);
+        GuiButton encodeButton = findStandardEncodeButton(gui, getButtonList(gui));
+        if (button == null || encodeButton == null) {
+            return;
+        }
+        EncodingSettings.setSettingsButtonPosition(
+                button.x - encodeButton.x,
+                button.y - encodeButton.y);
     }
 
     private static SettingsButton findSettingsButton(GuiScreen gui) {
@@ -480,6 +493,12 @@ public final class ClientHandler {
                 if (position != null) {
                     button.x = position.x;
                     button.y = position.y;
+                } else {
+                    GuiButton encodeButton = findStandardEncodeButton(gui, buttons);
+                    if (encodeButton != null && EncodingSettings.hasSettingsButtonPosition()) {
+                        button.x = encodeButton.x + EncodingSettings.getSettingsButtonOffsetX();
+                        button.y = encodeButton.y + EncodingSettings.getSettingsButtonOffsetY();
+                    }
                 }
                 return;
             }
@@ -488,8 +507,18 @@ public final class ClientHandler {
         GuiButton encodeButton = findStandardEncodeButton(gui, buttons);
         if (encodeButton != null) {
             SettingsButtonPosition position = SETTINGS_BUTTON_POSITIONS.get(gui);
-            int x = position == null ? encodeButton.x + encodeButton.width + 1 : position.x;
-            int y = position == null ? encodeButton.y : position.y;
+            int x;
+            int y;
+            if (position != null) {
+                x = position.x;
+                y = position.y;
+            } else if (EncodingSettings.hasSettingsButtonPosition()) {
+                x = encodeButton.x + EncodingSettings.getSettingsButtonOffsetX();
+                y = encodeButton.y + EncodingSettings.getSettingsButtonOffsetY();
+            } else {
+                x = encodeButton.x + encodeButton.width + 1;
+                y = encodeButton.y;
+            }
             buttons.add(new SettingsButton(x, y));
         }
     }

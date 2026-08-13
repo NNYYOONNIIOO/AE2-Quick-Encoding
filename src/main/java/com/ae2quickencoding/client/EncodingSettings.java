@@ -33,6 +33,9 @@ public final class EncodingSettings {
     private static boolean processingCombine;
     private static boolean processingFluidFirst;
     private static boolean replacementMode;
+    private static boolean settingsButtonPositionSet;
+    private static int settingsButtonOffsetX;
+    private static int settingsButtonOffsetY;
 
     private EncodingSettings() {
     }
@@ -182,6 +185,49 @@ public final class EncodingSettings {
                 "Select replacement-list mode when opening Quick Encoding settings.");
     }
 
+    public static boolean hasSettingsButtonPosition() {
+        return settingsButtonPositionSet;
+    }
+
+    public static int getSettingsButtonOffsetX() {
+        return settingsButtonOffsetX;
+    }
+
+    public static int getSettingsButtonOffsetY() {
+        return settingsButtonOffsetY;
+    }
+
+    public static void setSettingsButtonPosition(int offsetX, int offsetY) {
+        if (settingsButtonPositionSet
+                && settingsButtonOffsetX == offsetX
+                && settingsButtonOffsetY == offsetY) {
+            return;
+        }
+        settingsButtonPositionSet = true;
+        settingsButtonOffsetX = offsetX;
+        settingsButtonOffsetY = offsetY;
+        if (configuration == null) {
+            return;
+        }
+
+        Property setProperty = configuration.get(
+                CATEGORY_GENERAL, "settingsButtonPositionSet", true);
+        setProperty.setComment("Whether the Quick Encoding settings button has a saved position.");
+        setProperty.set(true);
+
+        Property xProperty = configuration.get(
+                CATEGORY_GENERAL, "settingsButtonOffsetX", offsetX);
+        xProperty.setComment("Horizontal offset from the AE2 pattern encoding button.");
+        xProperty.set(offsetX);
+
+        Property yProperty = configuration.get(
+                CATEGORY_GENERAL, "settingsButtonOffsetY", offsetY);
+        yProperty.setComment("Vertical offset from the AE2 pattern encoding button.");
+        yProperty.set(offsetY);
+
+        configuration.save();
+    }
+
     public static boolean isCraftingSubstitutionEnabled() {
         return craftingSubstitution;
     }
@@ -280,6 +326,17 @@ public final class EncodingSettings {
         replacementMode = configuration.getBoolean(
                 "replacementMode", CATEGORY_GENERAL, false,
                 "Select replacement-list mode when opening Quick Encoding settings.");
+        settingsButtonPositionSet = configuration.getBoolean(
+                "settingsButtonPositionSet", CATEGORY_GENERAL, false,
+                "Whether the Quick Encoding settings button has a saved position.");
+        settingsButtonOffsetX = configuration.getInt(
+                "settingsButtonOffsetX", CATEGORY_GENERAL, 1,
+                Integer.MIN_VALUE, Integer.MAX_VALUE,
+                "Horizontal offset from the AE2 pattern encoding button.");
+        settingsButtonOffsetY = configuration.getInt(
+                "settingsButtonOffsetY", CATEGORY_GENERAL, 0,
+                Integer.MIN_VALUE, Integer.MAX_VALUE,
+                "Vertical offset from the AE2 pattern encoding button.");
         if (configuration.hasChanged()) {
             configuration.save();
         }
