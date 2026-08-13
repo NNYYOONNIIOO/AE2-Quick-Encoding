@@ -149,7 +149,9 @@ public final class RecipeBookmarkCatalog {
             for (BookmarkGroup group : groups) {
                 for (BookmarkItem<?> item : new ArrayList<>(group.getItemsInternal())) {
                     if (targets.contains(item)) {
-                        group.removeItemInternal(item);
+                        // Use the group's public removal hook so RecipeBookmarkGroup
+                        // also updates its dependency chain and derived display rows.
+                        group.removeItem(item);
                         removed = true;
                     }
                 }

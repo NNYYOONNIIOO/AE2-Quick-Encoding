@@ -56,6 +56,7 @@ public final class ClientHandler {
     private static final Map<GuiScreen, FluidPatternSettingsButton> FLUID_SETTINGS_BUTTONS = new WeakHashMap<>();
     private static final Map<GuiScreen, SettingsListModeButton> SETTINGS_LIST_MODE_BUTTONS = new WeakHashMap<>();
     private static final Map<GuiScreen, SettingsButtonDragState> SETTINGS_BUTTON_DRAGS = new WeakHashMap<>();
+    private static final Map<GuiScreen, SettingsButtonPosition> SETTINGS_BUTTON_POSITIONS = new WeakHashMap<>();
     private static GuiScreen activeSettingsGui;
 
     @SubscribeEvent
@@ -70,6 +71,8 @@ public final class ClientHandler {
             FLUID_CRAFTING_BUTTONS.remove(gui);
             FLUID_SETTINGS_BUTTONS.remove(gui);
             SETTINGS_LIST_MODE_BUTTONS.remove(gui);
+            SETTINGS_BUTTON_DRAGS.remove(gui);
+            SETTINGS_BUTTON_POSITIONS.remove(gui);
         }
     }
 
@@ -144,6 +147,7 @@ public final class ClientHandler {
             // AE2 reinitalizes this GUI in-place for terminal-style and search-mode changes.
             // That path clears buttonList without emitting another Forge init event.
             ensureQuickEncodingControls(gui, getButtonList(gui));
+            updateSettingsButtonDrag(gui);
         }
         if (isSettingsMode(gui)) {
             syncSettingsTitle(gui);
@@ -165,12 +169,16 @@ public final class ClientHandler {
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public void onGuiMouse(GuiScreenEvent.MouseInputEvent.Pre event) {
         GuiScreen gui = event.getGui();
-        if (!isSettingsMode(gui) || gui.mc == null || !(gui instanceof GuiContainer)) {
+        if (!isPatternGui(gui) || gui.mc == null || !(gui instanceof GuiContainer)) {
             return;
         }
 
         if (handleSettingsButtonDrag(gui)) {
             event.setCanceled(true);
+            return;
+        }
+
+        if (!isSettingsMode(gui)) {
             return;
         }
 
@@ -219,19 +227,39 @@ public final class ClientHandler {
             SETTINGS_BUTTON_DRAGS.remove(gui);
             return true;
         }
+        return updateSettingsButtonDrag(gui);
+    }
+
+    private static boolean updateSettingsButtonDrag(GuiScreen gui) {
+        SettingsButtonDragState state = SETTINGS_BUTTON_DRAGS.get(gui);
+        if (state == null || !state.dragging) {
+            return false;
+        }
         if (!Mouse.isButtonDown(2)) {
             SETTINGS_BUTTON_DRAGS.remove(gui);
-            return true;
-        }
-        if (button == null) {
-            SETTINGS_BUTTON_DRAGS.remove(gui);
-            return true;
+            return false;
         }
 
+        SettingsButton button = findSettingsButton(gui);
+        if (button == null) {
+            SETTINGS_BUTTON_DRAGS.remove(gui);
+            return false;
+        }
+
+        int mouseX = Mouse.getX() * gui.width / gui.mc.displayWidth;
+        int mouseY = gui.height - Mouse.getY() * gui.height / gui.mc.displayHeight - 1;
         int x = mouseX - state.offsetX;
         int y = mouseY - state.offsetY;
         button.x = Math.max(0, Math.min(x, Math.max(0, gui.width - button.width)));
         button.y = Math.max(0, Math.min(y, Math.max(0, gui.height - button.height)));
+
+        SettingsButtonPosition position = SETTINGS_BUTTON_POSITIONS.get(gui);
+        if (position == null) {
+            position = new SettingsButtonPosition();
+            SETTINGS_BUTTON_POSITIONS.put(gui, position);
+        }
+        position.x = button.x;
+        position.y = button.y;
         return true;
     }
 
@@ -248,6 +276,11 @@ public final class ClientHandler {
         private int offsetX;
         private int offsetY;
         private boolean dragging;
+    }
+
+    private static final class SettingsButtonPosition {
+        private int x;
+        private int y;
     }
 
     public static boolean isPatternGui(GuiScreen gui) {
@@ -443,13 +476,21 @@ public final class ClientHandler {
     private static void ensureSettingsButton(GuiScreen gui, List<GuiButton> buttons) {
         for (GuiButton button : buttons) {
             if (button instanceof SettingsButton) {
+                SettingsButtonPosition position = SETTINGS_BUTTON_POSITIONS.get(gui);
+                if (position != null) {
+                    button.x = position.x;
+                    button.y = position.y;
+                }
                 return;
             }
         }
 
         GuiButton encodeButton = findStandardEncodeButton(gui, buttons);
         if (encodeButton != null) {
-            buttons.add(new SettingsButton(encodeButton.x + encodeButton.width + 1, encodeButton.y));
+            SettingsButtonPosition position = SETTINGS_BUTTON_POSITIONS.get(gui);
+            int x = position == null ? encodeButton.x + encodeButton.width + 1 : position.x;
+            int y = position == null ? encodeButton.y : position.y;
+            buttons.add(new SettingsButton(x, y));
         }
     }
 
