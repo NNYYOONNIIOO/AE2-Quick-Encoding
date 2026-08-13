@@ -55,6 +55,7 @@ public final class ClientHandler {
     private static final Map<GuiScreen, GuiButton> FLUID_CRAFTING_BUTTONS = new WeakHashMap<>();
     private static final Map<GuiScreen, FluidPatternSettingsButton> FLUID_SETTINGS_BUTTONS = new WeakHashMap<>();
     private static final Map<GuiScreen, SettingsListModeButton> SETTINGS_LIST_MODE_BUTTONS = new WeakHashMap<>();
+    private static final Map<GuiScreen, SettingsButtonDragState> SETTINGS_BUTTON_DRAGS = new WeakHashMap<>();
     private static GuiScreen activeSettingsGui;
 
     @SubscribeEvent
@@ -168,6 +169,11 @@ public final class ClientHandler {
             return;
         }
 
+        if (handleSettingsButtonDrag(gui)) {
+            event.setCanceled(true);
+            return;
+        }
+
         int mouseX = Mouse.getEventX() * gui.width / gui.mc.displayWidth;
         int mouseY = gui.height - Mouse.getEventY() * gui.height / gui.mc.displayHeight - 1;
         if (!isInsideBlacklistSlot(gui, mouseX, mouseY)) {
@@ -182,6 +188,66 @@ public final class ClientHandler {
             setBlacklistScroll(gui, getBlacklistScroll(gui) + direction * columns);
             event.setCanceled(true);
         }
+    }
+
+    private static boolean handleSettingsButtonDrag(GuiScreen gui) {
+        SettingsButton button = findSettingsButton(gui);
+        int mouseX = Mouse.getEventX() * gui.width / gui.mc.displayWidth;
+        int mouseY = gui.height - Mouse.getEventY() * gui.height / gui.mc.displayHeight - 1;
+        int mouseButton = Mouse.getEventButton();
+        boolean buttonState = Mouse.getEventButtonState();
+        SettingsButtonDragState state = SETTINGS_BUTTON_DRAGS.get(gui);
+
+        if (mouseButton == 2 && buttonState) {
+            if (button == null || !button.visible
+                    || mouseX < button.x || mouseX >= button.x + button.width
+                    || mouseY < button.y || mouseY >= button.y + button.height) {
+                return false;
+            }
+            state = new SettingsButtonDragState();
+            state.offsetX = mouseX - button.x;
+            state.offsetY = mouseY - button.y;
+            state.dragging = true;
+            SETTINGS_BUTTON_DRAGS.put(gui, state);
+            return true;
+        }
+
+        if (state == null || !state.dragging) {
+            return false;
+        }
+        if (mouseButton == 2 && !buttonState) {
+            SETTINGS_BUTTON_DRAGS.remove(gui);
+            return true;
+        }
+        if (!Mouse.isButtonDown(2)) {
+            SETTINGS_BUTTON_DRAGS.remove(gui);
+            return true;
+        }
+        if (button == null) {
+            SETTINGS_BUTTON_DRAGS.remove(gui);
+            return true;
+        }
+
+        int x = mouseX - state.offsetX;
+        int y = mouseY - state.offsetY;
+        button.x = Math.max(0, Math.min(x, Math.max(0, gui.width - button.width)));
+        button.y = Math.max(0, Math.min(y, Math.max(0, gui.height - button.height)));
+        return true;
+    }
+
+    private static SettingsButton findSettingsButton(GuiScreen gui) {
+        for (GuiButton button : getButtonList(gui)) {
+            if (button instanceof SettingsButton) {
+                return (SettingsButton) button;
+            }
+        }
+        return null;
+    }
+
+    private static final class SettingsButtonDragState {
+        private int offsetX;
+        private int offsetY;
+        private boolean dragging;
     }
 
     public static boolean isPatternGui(GuiScreen gui) {

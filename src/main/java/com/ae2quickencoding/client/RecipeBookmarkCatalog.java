@@ -21,6 +21,7 @@ import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fml.common.Loader;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -93,6 +94,87 @@ public final class RecipeBookmarkCatalog {
         } catch (Throwable ignored) {
             // The caller stops the batch when the bookmark is still present.
             return false;
+        }
+    }
+
+    /**
+     * Removes all completed bookmarks from one HEI snapshot. Resolving and
+     * removing them in one pass prevents HEI from rewriting dependent recipe
+     * bookmarks between two individual removals.
+     */
+    public static boolean removeBookmarks(List<RecipeEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return false;
+        }
+
+        boolean removed = false;
+        try {
+            BookmarkList bookmarkList = Internal.getBookmarkList();
+            Set<RecipeBookmarkItem<?>> expected =
+                    Collections.newSetFromMap(new IdentityHashMap<RecipeBookmarkItem<?>, Boolean>());
+            Set<RecipeBookmarkItem<?>> targets =
+                    Collections.newSetFromMap(new IdentityHashMap<RecipeBookmarkItem<?>, Boolean>());
+            for (RecipeEntry entry : entries) {
+                if (entry != null && entry.getBookmark() != null) {
+                    expected.add(entry.getBookmark());
+                }
+            }
+
+            List<BookmarkGroup> groups = new ArrayList<>(bookmarkList.getBookmarkGroupsInternal());
+            for (BookmarkGroup group : groups) {
+                for (BookmarkItem<?> item : new ArrayList<>(group.getItemsInternal())) {
+                    if (item instanceof RecipeBookmarkItem && expected.contains(item)) {
+                        targets.add((RecipeBookmarkItem<?>) item);
+                    }
+                }
+            }
+
+            // If HEI rebuilt the list, retain the old matching behavior only
+            // for entries that could not be found by identity.
+            for (RecipeEntry entry : entries) {
+                if (entry == null || entry.getBookmark() == null || expected.contains(entry.getBookmark())
+                        && targets.contains(entry.getBookmark())) {
+                    continue;
+                }
+                try {
+                    RecipeBookmarkItem<?> current = findCurrentBookmark(bookmarkList, entry.getBookmark());
+                    if (current != null) {
+                        targets.add(current);
+                    }
+                } catch (Throwable ignored) {
+                    // Continue resolving the other completed bookmarks.
+                }
+            }
+
+            for (BookmarkGroup group : groups) {
+                for (BookmarkItem<?> item : new ArrayList<>(group.getItemsInternal())) {
+                    if (targets.contains(item)) {
+                        group.removeItemInternal(item);
+                        removed = true;
+                    }
+                }
+                if (group.getItemsInternal().isEmpty()) {
+                    bookmarkList.getBookmarkGroupsInternal().remove(group);
+                }
+            }
+
+            if (removed) {
+                notifyBookmarkListChanged(bookmarkList);
+                bookmarkList.saveBookmarks();
+            }
+        } catch (Throwable ignored) {
+            // Keep the encoded patterns even if HEI changes its bookmark API.
+        }
+        return removed;
+    }
+
+    private static void notifyBookmarkListChanged(BookmarkList bookmarkList) {
+        try {
+            Method method = BookmarkList.class.getDeclaredMethod("notifyListenersOfChange");
+            method.setAccessible(true);
+            method.invoke(bookmarkList);
+        } catch (Throwable ignored) {
+            // Saving still keeps the bookmark file consistent.
         }
     }
 

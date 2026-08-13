@@ -17,6 +17,7 @@ public final class BatchEncodingController {
     private static int currentRequestId;
     private static int nextRequestId = 1;
     private static List<RecipeEntry> queuedEntries = Collections.emptyList();
+    private static List<RecipeEntry> encodedEntries = Collections.emptyList();
     private static int nextEntryIndex;
     private static boolean running;
 
@@ -47,6 +48,7 @@ public final class BatchEncodingController {
         }
 
         queuedEntries = entries;
+        encodedEntries = new ArrayList<>();
         nextEntryIndex = 0;
         running = true;
         if (!sendNext()) {
@@ -73,16 +75,19 @@ public final class BatchEncodingController {
         currentEntry = null;
         currentRequestId = 0;
         if (!completed) {
+            removeEncodedBookmarks();
             stop();
             return;
         }
-        if (!RecipeBookmarkCatalog.removeBookmark(finishedEntry)) {
-            stop();
-            return;
-        }
+        encodedEntries.add(finishedEntry);
         if (!sendNext()) {
+            removeEncodedBookmarks();
             stop();
         }
+    }
+
+    private static void removeEncodedBookmarks() {
+        RecipeBookmarkCatalog.removeBookmarks(encodedEntries);
     }
 
     private static boolean sendNext() {
@@ -111,6 +116,7 @@ public final class BatchEncodingController {
         currentEntry = null;
         currentRequestId = 0;
         queuedEntries = Collections.emptyList();
+        encodedEntries = Collections.emptyList();
         nextEntryIndex = 0;
         running = false;
     }
